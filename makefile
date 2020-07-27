@@ -1,0 +1,3 @@
+
+
+LIB = -lpjlib-util-x86_64-apple-darwin19.6.0  -lspeex-x86_64-apple-darwin19.6.0   -lwebrtc-x86_64-apple-darwin19.6.0  -lpj-x86_64-apple-darwin19.6.0 -lopus -lm -lpthread  -framework CoreAudio -framework CoreServices -framework AudioUnit -framework AudioToolbox -framework Foundation -framework AppKit -framework AVFoundation -framework CoreGraphics -framework QuartzCore  -framework CoreMedia  -L/usr/local/lib -lSDL2   -framework Security
