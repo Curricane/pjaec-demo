@@ -17,11 +17,11 @@ LIB = -lpjlib-util \
 	  -framework AVFoundation -framework CoreGraphics -framework QuartzCore  \
 	  -framework CoreMedia  -L/usr/local/lib -L./lib -lSDL2   -framework Security
 
-OBJ1 = alaw_ulaw.o alaw_ulaw_table.o clock_thread.o delaybuf.o echo_common.o \
+OBJ1 = alaw_ulaw.o alaw_ulaw_table.o buffer_port.o clock_thread.o delaybuf.o echo_common.o \
 		echo_port.o echo_speex.o echo_suppress.o echo_webrtc.o errno.o format.o port.c \
 		silencedet.o types.o wsola.o
 
-SRC1 = ./src/alaw_ulaw.c ./src/alaw_ulaw_table.c ./src/clock_thread.c ./src/delaybuf.c ./src/echo_common.c \
+SRC1 = ./src/alaw_ulaw.c ./src/alaw_ulaw_table.c ./src/buffer_port.c ./src/clock_thread.c ./src/delaybuf.c ./src/echo_common.c \
 		./src/echo_port.c ./src/echo_speex.c ./src/echo_suppress.c ./src/echo_webrtc.c ./src/errno.c ./src/format.c ./src/port.c \
 		./src/silencedet.c ./src/types.c ./src/wsola.c
 
