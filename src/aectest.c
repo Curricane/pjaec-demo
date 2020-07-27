@@ -90,11 +90,7 @@ static void app_perror(const char *sender, const char *title, pj_status_t st)
 int main(int argc, char *argv[])
 {
     pj_caching_pool cp;
-    pjmedia_endpt *med_endpt;
     pj_pool_t	  *pool;
-    pjmedia_port  *wav_play;
-    pjmedia_port  *wav_rec;
-    pjmedia_port  *wav_out;
     pj_status_t status;
     pjmedia_echo_state *ec;
     pjmedia_frame play_frame, rec_frame;
@@ -167,13 +163,6 @@ int main(int argc, char *argv[])
     /* Must create a pool factory before we can allocate any memory. */
     pj_caching_pool_init(&cp, &pj_pool_factory_default_policy, 0);
 
-    /* 
-     * Initialize media endpoint.
-     * This will implicitly initialize PJMEDIA too.
-     */
-    status = pjmedia_endpt_create(&cp.factory, NULL, 1, &med_endpt);
-    PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
-
     /* Create memory pool for our file player */
     pool = pj_pool_create( &cp.factory,	    /* pool factory	    */
 			   "wav",	    /* pool name.	    */
@@ -183,51 +172,20 @@ int main(int argc, char *argv[])
 			   );
 
     /* Open wav_play */
-    status = pjmedia_wav_player_port_create(pool, argv[pj_optind], PTIME, 
-					    PJMEDIA_FILE_NO_LOOP, 0, 
-					    &wav_play);
-    if (status != PJ_SUCCESS) {
-	app_perror(THIS_FILE, "Error opening playback WAV file", status);
-	return 1;
-    }
+    
     
     /* Open recorded wav */
-    status = pjmedia_wav_player_port_create(pool, argv[pj_optind+1], PTIME, 
-					    PJMEDIA_FILE_NO_LOOP, 0, 
-					    &wav_rec);
-    if (status != PJ_SUCCESS) {
-	app_perror(THIS_FILE, "Error opening recorded WAV file", status);
-	return 1;
-    }
+    
 
-    /* play and rec WAVs must have the same clock rate */
-    if (PJMEDIA_PIA_SRATE(&wav_play->info) != PJMEDIA_PIA_SRATE(&wav_rec->info)) {
-	puts("Error: clock rate mismatch in the WAV files");
-	return 1;
-    }
 
-    /* .. and channel count */
-    if (PJMEDIA_PIA_CCNT(&wav_play->info) != PJMEDIA_PIA_CCNT(&wav_rec->info)) {
-	puts("Error: clock rate mismatch in the WAV files");
-	return 1;
-    }
+    
 
     /* Create output wav */
-    status = pjmedia_wav_writer_port_create(pool, argv[pj_optind+2],
-					    PJMEDIA_PIA_SRATE(&wav_play->info),
-					    PJMEDIA_PIA_CCNT(&wav_play->info),
-					    PJMEDIA_PIA_SPF(&wav_play->info),
-					    PJMEDIA_PIA_BITS(&wav_play->info),
-					    0, 0, &wav_out);
-    if (status != PJ_SUCCESS) {
-	app_perror(THIS_FILE, "Error opening output WAV file", status);
-	return 1;
-    }
 
     /* Create echo canceller */
-    status = pjmedia_echo_create2(pool, PJMEDIA_PIA_SRATE(&wav_play->info),
-				  PJMEDIA_PIA_CCNT(&wav_play->info),
-				  PJMEDIA_PIA_SPF(&wav_play->info),
+    status = pjmedia_echo_create2(pool, 16000,
+				  1,
+				  10,
 				  tail_ms, latency_ms,
 				  opt, &ec);
     if (status != PJ_SUCCESS) {
@@ -237,49 +195,29 @@ int main(int argc, char *argv[])
 
 
     /* Processing loop */
-    play_frame.buf = pj_pool_alloc(pool, PJMEDIA_PIA_SPF(&wav_play->info)<<1);
-    rec_frame.buf = pj_pool_alloc(pool, PJMEDIA_PIA_SPF(&wav_play->info)<<1);
+    play_frame.buf = pj_pool_alloc(pool, 10<<1);
+    rec_frame.buf = pj_pool_alloc(pool, 10<<1);
     pj_get_timestamp(&t0);
     for (i=0; i < repeat; ++i) {
-	for (;;) {
-	    play_frame.size = PJMEDIA_PIA_SPF(&wav_play->info) << 1;
-	    status = pjmedia_port_get_frame(wav_play, &play_frame);
-	    if (status != PJ_SUCCESS)
-		break;
+	for (int j = 0; j < 1000; j++) {
+	    play_frame.size = 10 << 1;
 
 	    status = pjmedia_echo_playback(ec, (short*)play_frame.buf);
 
-	    rec_frame.size = PJMEDIA_PIA_SPF(&wav_play->info) << 1;
-	    status = pjmedia_port_get_frame(wav_rec, &rec_frame);
-	    if (status != PJ_SUCCESS)
-		break;
+	    rec_frame.size = 10 << 1;
 
 	    status = pjmedia_echo_capture(ec, (short*)rec_frame.buf, 0);
 
 	    //status = pjmedia_echo_cancel(ec, (short*)rec_frame.buf, 
 	    //			     (short*)play_frame.buf, 0, NULL);
-
-	    pjmedia_port_put_frame(wav_out, &rec_frame);
 	}
 
-	pjmedia_wav_player_port_set_pos(wav_play, 0);
-	pjmedia_wav_player_port_set_pos(wav_rec, 0);
     }
     pj_get_timestamp(&t1);
 
-    i = (int)pjmedia_wav_writer_port_get_pos(wav_out) / sizeof(pj_int16_t) * 1000 / 
-	 (PJMEDIA_PIA_SRATE(&wav_out->info) * PJMEDIA_PIA_CCNT(&wav_out->info));
-    PJ_LOG(3,(THIS_FILE, "Processed %3d.%03ds audio",
-	      i / 1000, i % 1000));
     PJ_LOG(3,(THIS_FILE, "Completed in %u msec\n", pj_elapsed_msec(&t0, &t1)));
 
     /* Destroy file port(s) */
-    status = pjmedia_port_destroy( wav_play );
-    PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
-    status = pjmedia_port_destroy( wav_rec );
-    PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
-    status = pjmedia_port_destroy( wav_out );
-    PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
 
     /* Destroy ec */
     pjmedia_echo_destroy(ec);
@@ -288,7 +226,6 @@ int main(int argc, char *argv[])
     pj_pool_release( pool );
 
     /* Destroy media endpoint. */
-    pjmedia_endpt_destroy( med_endpt );
 
     /* Destroy pool factory */
     pj_caching_pool_destroy( &cp );
