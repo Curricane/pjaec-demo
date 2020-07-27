@@ -34,7 +34,7 @@ static pj_status_t buffer_get_frame(pjmedia_port *this_port,
                 pjmedia_frame *frame);
 static pj_status_t buffer_on_destroy(pjmedia_port *this_port);
 
-static struct buffer_port *create_buffer_port(pj_pool_t *pool,
+struct buffer_port *create_buffer_port(pj_pool_t *pool,
                 unsigned int clock_rate,
                 unsigned int channel_count,
                 unsigned int bits_per_sample,
@@ -64,7 +64,7 @@ static struct buffer_port *create_buffer_port(pj_pool_t *pool,
     if (!port->buf)
     {
         PJ_LOG(4, (THIS_FILE, "failed to init buffer_port->buf"));
-        return PJ_ENOMEM;
+        return NULL;
     }
 
     // 开始读数据的位置为buf的首地址
@@ -79,7 +79,7 @@ static struct buffer_port *create_buffer_port(pj_pool_t *pool,
 */
 static pj_status_t fill_buffer(struct buffer_port * bport)
 {
-    pj_uint32_t size_left = bport->bufsize;
+
     pj_status_t status;
 
     status = bport->getdata(bport->buf, &bport->bufsize, bport->bufcap);
@@ -103,7 +103,7 @@ static pj_status_t buffer_get_frame(pjmedia_port *this_port,
     pj_status_t status = PJ_SUCCESS;
 
     pj_assert(bport->base.info.signature == SIGNATURE);
-    pj_assert(frame->size <= bport->bufsize);
+    pj_assert(frame->size <= bport->bufcap);
 
     // pj_assert(bport->fmt_tag == PJMEDIA_WAVE_FMT_TAG_PCM);
     // 假设当前只支持 pcm
