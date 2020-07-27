@@ -29,6 +29,7 @@
  *
  * \includelineno aectest.c
  */
+#include <pjmedia/buffer_port.h>
 #include <pjmedia.h>
 #include <pjlib-util.h>	/* pj_getopt */
 #include <pjlib.h>
@@ -83,6 +84,20 @@ static void app_perror(const char *sender, const char *title, pj_status_t st)
     PJ_LOG(3,(sender, "%s: %s", title, errmsg));
 }
 
+pj_status_t play_cb(char *buf, unsigned int *len, unsigned int maxcap)
+{
+	pj_memset(buf, 0, maxcap / 2);
+	*len = maxcap / 2;
+	return PJ_SUCCESS;
+}
+
+pj_status_t rec_cb(char *buf, unsigned int *len, unsigned int maxcap)
+{
+	pj_memset(buf, 0, maxcap / 2);
+	*len = maxcap / 2;
+	return PJ_SUCCESS;
+}
+
 
 /*
  * main()
@@ -99,7 +114,14 @@ int main(int argc, char *argv[])
     unsigned tail_ms = TAIL_LENGTH;
     pj_timestamp t0, t1;
     int i, repeat=1, interactive=0, c;
+	struct buffer_port *play_port;
+	struct buffer_port *rec_port;
 
+	unsigned int clock_rate = 16000; 
+	unsigned int channel_count = 1;
+	unsigned int bits_per_sample = 16; 
+	unsigned int samples_per_frame = clock_rate / 1000 * 10; // 10ms一帧
+	unsigned int buffercap = bits_per_sample / 2 * samples_per_frame * 20; 
     pj_optind = 0;
     while ((c=pj_getopt(argc, argv, "d:l:a:r:i")) !=-1) {
 	switch (c) {
@@ -172,10 +194,26 @@ int main(int argc, char *argv[])
 			   );
 
     /* Open wav_play */
-    
+    play_port = create_buffer_port(
+		pool,
+		clock_rate,
+		channel_count,
+		bits_per_sample,
+		samples_per_frame,
+		buffercap,
+		play_cb
+	);
     
     /* Open recorded wav */
-    
+    rec_port = create_buffer_port(
+		pool,
+		clock_rate,
+		channel_count,
+		bits_per_sample,
+		samples_per_frame,
+		buffercap,
+		rec_cb
+	);
 
 
     
@@ -183,9 +221,9 @@ int main(int argc, char *argv[])
     /* Create output wav */
 
     /* Create echo canceller */
-    status = pjmedia_echo_create2(pool, 16000,
-				  1,
-				  10,
+    status = pjmedia_echo_create2(pool, clock_rate,
+				  channel_count,
+				  samples_per_frame,
 				  tail_ms, latency_ms,
 				  opt, &ec);
     if (status != PJ_SUCCESS) {
@@ -195,17 +233,19 @@ int main(int argc, char *argv[])
 
 
     /* Processing loop */
-    play_frame.buf = pj_pool_alloc(pool, 10<<1);
-    rec_frame.buf = pj_pool_alloc(pool, 10<<1);
+    play_frame.buf = pj_pool_alloc(pool, samples_per_frame <<1);
+    rec_frame.buf = pj_pool_alloc(pool, samples_per_frame <<1);
     pj_get_timestamp(&t0);
     for (i=0; i < repeat; ++i) {
 	for (int j = 0; j < 1000; j++) {
-	    play_frame.size = 10 << 1;
+	    play_frame.size = samples_per_frame << 1;
+		pjmedia_port_get_frame(play_port, &play_frame);
 
 	    status = pjmedia_echo_playback(ec, (short*)play_frame.buf);
 
-	    rec_frame.size = 10 << 1;
+	    rec_frame.size = samples_per_frame << 1;
 
+		pjmedia_port_get_frame(rec_port, &rec_frame);
 	    status = pjmedia_echo_capture(ec, (short*)rec_frame.buf, 0);
 
 	    //status = pjmedia_echo_cancel(ec, (short*)rec_frame.buf, 
@@ -218,6 +258,8 @@ int main(int argc, char *argv[])
     PJ_LOG(3,(THIS_FILE, "Completed in %u msec\n", pj_elapsed_msec(&t0, &t1)));
 
     /* Destroy file port(s) */
+	pjmedia_port_destroy(play_port);
+	pjmedia_port_destroy(rec_port);
 
     /* Destroy ec */
     pjmedia_echo_destroy(ec);
