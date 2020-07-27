@@ -994,7 +994,8 @@
  * By default it is enabled.
  */
 #ifndef PJMEDIA_HAS_SRTP
-#   define PJMEDIA_HAS_SRTP			    1
+// #   define PJMEDIA_HAS_SRTP			    1
+#   define PJMEDIA_HAS_SRTP			    0 // disable support for SRTP, we do not new srtp
 #endif
 
 
